@@ -3,9 +3,9 @@ name: ML Deployment Pipeline
 on:
   push:
     branches: [ "main" ]
-  push:
     tags: [ "v*" ]
   workflow_dispatch:
+
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
