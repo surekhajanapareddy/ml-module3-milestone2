@@ -49,7 +49,8 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - run: gcloud run deploy ml-api-dev --image ${{ needs.build.outputs.image }} --region $REGION --platform managed --allow-unauthenticated
+      - run: gcloud run deploy ml-api-dev --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
+
 
 
 
@@ -64,7 +65,8 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - run: gcloud run deploy ml-api-test --image ${{ needs.build.outputs.image }} --region $REGION --platform managed --allow-unauthenticated
+      - run: gcloud run deploy ml-api-test --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
+
 
 
 
@@ -78,7 +80,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
       
-      - run: gcloud run deploy ml-api-stg --image ${{ needs.build.outputs.image }} --region $REGION --platform managed --allow-unauthenticated
+      - run: gcloud run deploy ml-api-stg --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
 
 
 # ---------- PRODUCTION ----------
@@ -92,4 +94,5 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
      
-      - run: gcloud run deploy ml-api-prod --image ${{ needs.build.outputs.image }} --region $REGION --platform managed --allow-unauthenticated
+      - run: gcloud run deploy ml-api-prod --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
+
