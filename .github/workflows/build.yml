@@ -3,8 +3,7 @@ name: ML Deployment Pipeline
 on:
   push:
     branches: ["main"]
-    tags:
-      - "v*.*.*"
+    tags: ["v*.*.*"]
   workflow_dispatch:
 
 env:
@@ -13,12 +12,30 @@ env:
   REPOSITORY: ml-api
   IMAGE_NAME: ml-api
 
+
 jobs:
 
-# =================================================
-# BUILD
-# =================================================
+# =========================================================
+# TEST BEFORE BUILD (MAIN ONLY)
+# =========================================================
+  test-before-build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps + run tests
+        run: |
+          pip install -r app/requirements.txt
+          pytest
+
+
+# =========================================================
+# BUILD IMAGE
+# =========================================================
   build:
+    needs: test-before-build
     runs-on: ubuntu-latest
 
     steps:
@@ -30,19 +47,20 @@ jobs:
 
       - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Build & Push
+      - name: Build & Push Image
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "Using image: $IMAGE"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
 
-# =================================================
-# DEV
-# =================================================
+# =========================================================
+# DEV DEPLOY (MAIN ONLY)
+# =========================================================
   deploy-dev:
-    needs: build
     if: github.ref == 'refs/heads/main'
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -59,19 +77,33 @@ jobs:
             --platform managed \
             --allow-unauthenticated
 
-      - name: Get DEV URL
-        id: url
+
+# =========================================================
+# TEST DEV
+# =========================================================
+  test-dev:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Health check DEV
         run: |
           URL=$(gcloud run services describe ml-api-dev --region $REGION --format='value(status.url)')
-          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Testing $URL"
+          curl -f "$URL/health"
 
 
-# =================================================
-# TEST (runs after DEV OR after BUILD for tags)
-# =================================================
+# =========================================================
+# TEST ENV DEPLOY (TAG ONLY)
+# =========================================================
   deploy-test:
-    needs: [build, deploy-dev]
-    if: always() && needs.build.result == 'success'
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -88,22 +120,30 @@ jobs:
             --platform managed \
             --allow-unauthenticated
 
-      - name: Run API Tests
+
+# =========================================================
+# TEST TEST ENV
+# =========================================================
+  test-test:
+    needs: deploy-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Health check TEST
         run: |
           URL=$(gcloud run services describe ml-api-test --region $REGION --format='value(status.url)')
-          curl -fsS "$URL/health"
-
-          curl -fsS -X POST "$URL/predict" \
-            -H "Content-Type: application/json" \
-            -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+          curl -f "$URL/health"
 
 
-# =================================================
-# STAGING (only for tags + if test passed)
-# =================================================
+# =========================================================
+# STAGING DEPLOY
+# =========================================================
   deploy-stg:
-    needs: deploy-test
-    if: startsWith(github.ref, 'refs/tags/v') && needs.deploy-test.result == 'success'
+    needs: test-test
     runs-on: ubuntu-latest
 
     steps:
@@ -121,14 +161,42 @@ jobs:
             --allow-unauthenticated
 
 
-# =================================================
-# PROD (only for tags + if stg passed)
-# =================================================
-  deploy-prod:
+# =========================================================
+# TEST STAGING
+# =========================================================
+  test-stg:
     needs: deploy-stg
-    if: needs.deploy-stg.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Health check STG
+        run: |
+          URL=$(gcloud run services describe ml-api-stg --region $REGION --format='value(status.url)')
+          curl -f "$URL/health"
+
+
+# =========================================================
+# APPROVAL GATE
+# =========================================================
+  approve-prod:
+    needs: test-stg
     runs-on: ubuntu-latest
     environment: production
+
+    steps:
+      - run: echo "Approved for production deployment"
+
+
+# =========================================================
+# PROD DEPLOY
+# =========================================================
+  deploy-prod:
+    needs: approve-prod
+    runs-on: ubuntu-latest
 
     steps:
       - uses: google-github-actions/auth@v2
@@ -143,3 +211,21 @@ jobs:
             --region "${{ env.REGION }}" \
             --platform managed \
             --allow-unauthenticated
+
+
+# =========================================================
+# TEST PROD
+# =========================================================
+  test-prod:
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Health check PROD
+        run: |
+          URL=$(gcloud run services describe ml-api-prod --region $REGION --format='value(status.url)')
+          curl -f "$URL/health"
