@@ -15,31 +15,32 @@ env:
 jobs:
 
 # ---------- BUILD IMAGE ----------
+ # ---------- BUILD IMAGE ----------
   build:
-  runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-  outputs:
-    image: ${{ steps.image.outputs.image }}
+    outputs:
+      image: ${{ steps.image.outputs.image }}
 
-  steps:
-    - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-    - uses: google-github-actions/auth@v2
-      with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-    - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+      - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-    - id: image
-      run: |
-        IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
-        echo "Building $IMAGE"
-        docker build -t "$IMAGE" .
-        docker push "$IMAGE"
-        echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+      - id: image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
+          echo "Building $IMAGE"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
-    - name: Debug output
-      run: echo "Built image is ${{ steps.image.outputs.image }}"
+      - name: Debug output
+        run: echo "Built image is ${{ steps.image.outputs.image }}"
 
 
 
