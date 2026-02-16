@@ -2,8 +2,9 @@ name: ML Deployment Pipeline
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
+    branches: ["main"]
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 env:
@@ -11,11 +12,15 @@ env:
   REGION: us-central1
   REPOSITORY: ml-api
 
+# =========================================================
+# BUILD IMAGE
+# =========================================================
 jobs:
-
-# ================= BUILD =================
   build:
     runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.build.outputs.image }}
 
     steps:
       - uses: actions/checkout@v4
@@ -24,18 +29,22 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+      - name: Configure Docker Auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Build & Push
+      - name: Build and Push Image
+        id: build
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
-          echo "Building $IMAGE"
+          echo "Building image: $IMAGE"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
 
-
-# ================= DEV =================
+# =========================================================
+# DEV DEPLOY
+# =========================================================
   deploy-dev:
     needs: build
     if: github.ref == 'refs/heads/main'
@@ -48,20 +57,34 @@ jobs:
 
       - name: Deploy DEV
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
           gcloud run deploy ml-api-dev \
-            --image "$IMAGE" \
+            --image "${{ needs.build.outputs.image }}" \
             --region "${{ env.REGION }}" \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --labels env=dev,version=${{ github.sha }}
+
+      - name: Get DEV URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ml-api-dev --region $REGION --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: DEV Smoke Test
+        run: |
+          curl -f "${{ steps.url.outputs.url }}/health"
 
 
-
-# ================= TEST =================
+# =========================================================
+# TEST DEPLOY
+# =========================================================
   deploy-test:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && success()
     runs-on: ubuntu-latest
+
+    outputs:
+      passed: ${{ job.status }}
 
     steps:
       - uses: google-github-actions/auth@v2
@@ -70,19 +93,38 @@ jobs:
 
       - name: Deploy TEST
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
           gcloud run deploy ml-api-test \
-            --image "$IMAGE" \
+            --image "${{ needs.build.outputs.image }}" \
             --region "${{ env.REGION }}" \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --labels env=test,version=${{ github.ref_name }}
+
+      - name: Get TEST URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ml-api-test --region $REGION --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: TEST Integration Test
+        run: |
+          curl -f "${{ steps.url.outputs.url }}/health"
+
+          curl -f -X POST "${{ steps.url.outputs.url }}/predict" \
+            -H "Content-Type: application/json" \
+            -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
 
 
-
-# ================= STAGING =================
+# =========================================================
+# STAGING DEPLOY (ONLY IF TEST PASSED)
+# =========================================================
   deploy-stg:
     needs: deploy-test
+    if: needs.deploy-test.result == 'success'
     runs-on: ubuntu-latest
+
+    outputs:
+      passed: ${{ job.status }}
 
     steps:
       - uses: google-github-actions/auth@v2
@@ -91,18 +133,30 @@ jobs:
 
       - name: Deploy STG
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
           gcloud run deploy ml-api-stg \
-            --image "$IMAGE" \
+            --image "${{ needs.build.outputs.image }}" \
             --region "${{ env.REGION }}" \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --labels env=stg,version=${{ github.ref_name }}
+
+      - name: Get STG URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ml-api-stg --region $REGION --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: STG Validation Test
+        run: |
+          curl -f "${{ steps.url.outputs.url }}/health"
 
 
-
-# ================= PROD =================
+# =========================================================
+# PRODUCTION DEPLOY (ONLY IF STG PASSED)
+# =========================================================
   deploy-prod:
     needs: deploy-stg
+    if: needs.deploy-stg.result == 'success'
     runs-on: ubuntu-latest
     environment: production
 
@@ -113,9 +167,19 @@ jobs:
 
       - name: Deploy PROD
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
           gcloud run deploy ml-api-prod \
-            --image "$IMAGE" \
+            --image "${{ needs.build.outputs.image }}" \
             --region "${{ env.REGION }}" \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --labels env=prod,version=${{ github.ref_name }}
+
+      - name: Get PROD URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ml-api-prod --region $REGION --format='value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: PROD Health Check
+        run: |
+          curl -f "${{ steps.url.outputs.url }}/health"
