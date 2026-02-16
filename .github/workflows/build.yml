@@ -31,11 +31,14 @@ jobs:
       - run: gcloud auth configure-docker $REGION-docker.pkg.dev
 
       - id: image
+        shell: bash
         run: |
-          IMAGE=$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/ml-api:${{ github.sha }}
-          docker build -t $IMAGE .
-          docker push $IMAGE
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
+          echo "IMAGE=$IMAGE"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
 
 
 # ---------- DEV DEPLOY ----------
