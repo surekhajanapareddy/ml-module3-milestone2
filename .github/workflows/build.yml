@@ -6,7 +6,6 @@ on:
     tags: [ "v*" ]
   workflow_dispatch:
 
-
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
@@ -14,37 +13,43 @@ env:
 
 jobs:
 
-# ---------- BUILD IMAGE ----------
- # ---------- BUILD IMAGE ----------
+# =========================================================
+# BUILD IMAGE
+# =========================================================
   build:
     runs-on: ubuntu-latest
 
     outputs:
-      image: ${{ steps.image.outputs.image }}
+      image: ${{ steps.export.outputs.image }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: google-github-actions/auth@v2
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+      - name: Configure Docker Auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - id: image
+      - name: Build and Push Image
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
-          echo "Building $IMAGE"
+          echo "IMAGE=$IMAGE"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-      - name: Debug output
-        run: echo "Built image is ${{ steps.image.outputs.image }}"
+      - name: Export image output
+        id: export
+        run: echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
 
 
-# ---------- DEV DEPLOY ----------
+# =========================================================
+# DEV DEPLOY (auto on push main)
+# =========================================================
   deploy-dev:
     if: github.ref == 'refs/heads/main'
     needs: build
@@ -59,8 +64,9 @@ jobs:
 
 
 
-
-# ---------- TEST DEPLOY ----------
+# =========================================================
+# TEST DEPLOY (on version tag)
+# =========================================================
   deploy-test:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
@@ -75,8 +81,9 @@ jobs:
 
 
 
-
-# ---------- STAGING ----------
+# =========================================================
+# STAGING DEPLOY
+# =========================================================
   deploy-stg:
     needs: deploy-test
     runs-on: ubuntu-latest
@@ -85,11 +92,14 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
-      
+
       - run: gcloud run deploy ml-api-stg --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
 
 
-# ---------- PRODUCTION ----------
+
+# =========================================================
+# PRODUCTION DEPLOY (manual approval required)
+# =========================================================
   deploy-prod:
     needs: deploy-stg
     runs-on: ubuntu-latest
@@ -99,6 +109,5 @@ jobs:
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
-     
-      - run: gcloud run deploy ml-api-prod --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
 
+      - run: gcloud run deploy ml-api-prod --image "${{ needs.build.outputs.image }}" --region "${{ env.REGION }}" --platform managed --allow-unauthenticated
