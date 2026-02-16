@@ -17,34 +17,32 @@ jobs:
 # BUILD IMAGE
 # =========================================================
   build:
-    runs-on: ubuntu-latest
+  runs-on: ubuntu-latest
 
-    outputs:
-      image: ${{ steps.export.outputs.image }}
+  outputs:
+    image: ${{ steps.build-image.outputs.image }}
 
-    steps:
-      - uses: actions/checkout@v4
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - name: Configure Docker Auth
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+    - name: Configure Docker
+      run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Build and Push Image
-        run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
-          echo "IMAGE=$IMAGE"
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+    - name: Build + Push Image
+      id: build-image
+      run: |
+        IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/ml-api:${{ github.sha }}"
+        echo "Using image: $IMAGE"
+        docker build -t "$IMAGE" .
+        docker push "$IMAGE"
+        echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
-      - name: Export image output
-        id: export
-        run: echo "image=$IMAGE" >> $GITHUB_OUTPUT
-
+    
 
 
 # =========================================================
