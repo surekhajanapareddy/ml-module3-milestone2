@@ -35,7 +35,7 @@ jobs:
 # BUILD IMAGE
 # =========================================================
   build:
-    needs: test-before-build
+    
     runs-on: ubuntu-latest
 
     steps:
