@@ -90,6 +90,7 @@ PATCH → bug fix
 
 Tags trigger release pipeline automatically.
 
+
 ---
 
 # 6. Rollback Strategy
@@ -174,6 +175,32 @@ Automation
 Security  
 Observability  
 Rollback-Ready Architecture  
+
+---
+
+# 11. Container Security Hardening
+
+The container is configured to run as a non-root user to minimize security risks.
+
+A dedicated user is created during build:
+```
+RUN useradd -m appuser
+USER appuser
+```
+Running containers as non-root prevents privilege escalation and reduces the attack surface if the container is compromised.
+
+---
+
+# Manual Approval Gate for Production
+
+The CI/CD pipeline implements an approval gate before deploying to production.
+Implementation:
+
+```
+deploy-prod:
+  environment: production
+```
+Production deployments are protected by a manual approval gate to ensure release safety and controlled rollouts.
 
 ---
 
