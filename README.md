@@ -89,12 +89,12 @@ http://localhost:8000/docs
 
 Pull image from Artifact Registry
 ```
-docker pull us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api-surekhajanapareddy:v1.0.4
+docker pull us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api-surekhajanapareddy:v2.0.1
 ```
 
 Run container
 ```
-docker run -p 8000:8000 us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api-surekhajanapareddy:v1.0.4
+docker run -p 8000:8000 us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api-surekhajanapareddy:v2.0.1
 ```
 
 ---
