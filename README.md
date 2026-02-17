@@ -107,6 +107,17 @@ Testing → Automated Post-Deployment Validation
 
 ---
 
+## Final API endpoints per environment
+
+```
+DEV: https://ml-api-dev-827099598475.us-central1.run.app/docs
+TEST: https://ml-api-test-240926533780.us-central1.run.app/docs
+STG: https://ml-api-stg-240926533780.us-central1.run.app/docs
+PROD: https://ml-api-prod-240926533780.us-central1.run.app/docs
+```
+
+---
+
 ## Documentation
 
 For operational and engineering details see:
