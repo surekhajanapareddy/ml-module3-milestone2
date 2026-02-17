@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+venv/
+.env/
+*.log
+tests/
+README.md
+RUNBOOK.md
+.ipynb_checkpoints/
+*.ipynb
+.github/
+.DS_Store
+Thumbs.db
