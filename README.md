@@ -1,6 +1,6 @@
 # ML API Deployment Pipeline — Milestone 2
 
-![CI/CD Status](https://github.com/surekhajanapareddy/ml-module3-milestone2/actions/workflows/build.yml/badge.svg)
+[![CI Status](https://github.com/surekhajanapareddy/ml-module3-milestone2/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/surekhajanapareddy/ml-module3-milestone2/actions/workflows/build.yml)
 
 ---
 
@@ -59,7 +59,7 @@ Images are tagged using both semantic versioning (vX.Y.Z) and commit SHA to ensu
 Images are stored in Google Artifact Registry:
 
 ```
-us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api:<tag>
+us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api-surekhajanapareddy:<tag>
 ```
 
 ---
