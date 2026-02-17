@@ -54,6 +54,8 @@ PRODUCTION | ml-api-prod | manual approval |
 
 ## Container Registry
 
+Images are tagged using both semantic versioning (vX.Y.Z) and commit SHA to ensure traceability, reproducibility, and safe rollbacks. Images are stored using a student-specific namespace dynamically to prevent collisions and ensure traceability.
+
 Images are stored in Google Artifact Registry:
 
 ```

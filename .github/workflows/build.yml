@@ -10,8 +10,7 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
   REPOSITORY: ml-api
-  IMAGE_NAME: ml-api
-
+  IMAGE_NAME: ml-api-${{ github.actor }}
 
 jobs:
 
@@ -35,7 +34,6 @@ jobs:
 # BUILD IMAGE
 # =========================================================
   build:
-    
     runs-on: ubuntu-latest
 
     steps:
@@ -49,10 +47,25 @@ jobs:
 
       - name: Build & Push Image
         run: |
-          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          echo "Using image: $IMAGE"
-          docker build -t "$IMAGE" .
-          docker push "$IMAGE"
+          BASE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
+
+          echo "Git ref: $GITHUB_REF"
+          echo "Actor: $GITHUB_ACTOR"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            echo "Release build detected: $VERSION"
+
+            docker build -t "$BASE:$VERSION" -t "$BASE:${GITHUB_SHA}" .
+            docker push "$BASE:$VERSION"
+            docker push "$BASE:${GITHUB_SHA}"
+
+          else
+            echo "Main branch build detected"
+
+            docker build -t "$BASE:${GITHUB_SHA}" .
+            docker push "$BASE:${GITHUB_SHA}"
+          fi
 
 
 # =========================================================
@@ -71,6 +84,7 @@ jobs:
       - name: Deploy DEV
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
           gcloud run deploy ml-api-dev \
             --image "$IMAGE" \
             --region "${{ env.REGION }}" \
@@ -114,6 +128,7 @@ jobs:
       - name: Deploy TEST
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
           gcloud run deploy ml-api-test \
             --image "$IMAGE" \
             --region "${{ env.REGION }}" \
@@ -154,6 +169,7 @@ jobs:
       - name: Deploy STG
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
           gcloud run deploy ml-api-stg \
             --image "$IMAGE" \
             --region "${{ env.REGION }}" \
@@ -206,6 +222,7 @@ jobs:
       - name: Deploy PROD
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
           gcloud run deploy ml-api-prod \
             --image "$IMAGE" \
             --region "${{ env.REGION }}" \
