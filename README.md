@@ -1,226 +1,106 @@
-![CI Status](https://github.com/surekhajanapareddy/ml-module3-milestone2/actions/workflows/build.yml/badge.svg) 
+# ML API Deployment Pipeline — Milestone 2
 
-# Project Overview
+![CI/CD Status](https://github.com/surekhajanapareddy/ml-module3-milestone2/actions/workflows/build.yml/badge.svg)
 
-This project demonstrates a production-grade MLOps CI/CD pipeline that automatically builds, tests, versions, and deploys a machine learning API across multiple environments using:
+---
 
-    Docker
-    Google Cloud Run
-    Google Artifact Registry
-    GitHub Actions CI/CD
+## Project Overview
+This project demonstrates a production-grade MLOps CI/CD pipeline that automatically builds, tests, versions, and deploys a machine learning API across multiple environments using Docker, GitHub Actions, and Google Cloud Run.
 
-The system follows a real-world promotion pipeline:
+It implements a real DevOps release lifecycle:
 
-``` bash
 DEV → TEST → STAGING → PRODUCTION
+
+---
+
+## Architecture Flow
+
+Developer Push → GitHub Actions → Build → Push Image → Deploy → Test → Promote
+
+---
+
+## Environments
+
+| Environment | Cloud Run Service | Trigger |
+|------------|-------------------|--------|
+DEV | ml-api-dev | push to main |
+TEST | ml-api-test | version tag |
+STAGING | ml-api-stg | after TEST passes |
+PRODUCTION | ml-api-prod | manual approval |
+
+---
+
+## CI/CD Pipeline Logic
+
+### On Push to main
+    1. Run API tests
+    2. Build Docker image
+    3. Push image to Artifact Registry
+    4. Deploy to DEV
+    5. Test deployed API
+
+---
+
+### On Version Tag (vX.Y.Z)
+    1. Deploy same build to TEST
+    2. Test API
+    3. Deploy to STAGING
+    4. Test API
+    5. Manual approval
+    6. Deploy to PRODUCTION
+    7. Final API test
+
+---
+
+## Container Registry
+
+Images are stored in Google Artifact Registry:
+
 ```
-# Architecture
-
-    Developer Push / Tag
-            ↓
-    GitHub Actions CI/CD
-            ↓
-    Build Docker Image
-            ↓
-    Push → Artifact Registry
-            ↓
-    Deploy → Cloud Run (DEV)
-            ↓
-    API Test
-            ↓
-    Deploy → TEST
-            ↓
-    API Test
-            ↓
-    Deploy → STAGING
-            ↓
-    API Test
-            ↓
-    Manual Approval
-            ↓
-    Deploy → PRODUCTION
-            ↓
-    Final API Test
-
-# Environments
-
-| Environment | Service Name | Trigger           |
-| ----------- | ------------ | ----------------- |
-| DEV         | ml-api-dev   | push to main      |
-| TEST        | ml-api-test  | version tag       |
-| STG         | ml-api-stg   | after TEST passes |
-| PROD        | ml-api-prod  | after approval    |
-
-# CI/CD Pipeline Logic (Implemented Flow)
-
-On push to main branch
-
-``` bash
-Test API → Build → Deploy DEV → Test API
-```
-On tag push (vX.Y.Z)
-
-``` bash
-Build (same image)
-      ↓
-Deploy TEST → Test
-      ↓
-Deploy STG → Test
-      ↓
-Manual Approval
-      ↓
-Deploy PROD → Test
-```
-If any test fails → pipeline stops automatically.
-
-# Container Registry Integration
-
-Container Registry Integration
-
-## Registry URL
-
-``` bash 
-us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api
+us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api:<tag>
 ```
 
-## Image tag format:
+---
 
-``` bash
-<commit-sha>
+## Quick Start — Local Run
+
+Clone repo
+```
+git clone https://github.com/surekhajanapareddy/ml-module3-milestone2.git
+cd ml-module3-milestone2
 ```
 
-## Example
-
-``` bash 
-us-central1-docker.pkg.dev/mlops-module3-milestone2-sj/ml-api/ml-api:92cf967e4648f0ea67e707ba67dad0043781c345
+Build image
 ```
-
-# Automated Testing Strategy
-
-Tests run:
-
-    before build
-    after every deployment
-
-Health check endpoint used:
-
-``` bash
-GET /health
-```
-
-Example validation command:
-
-``` bash
-https://ml-api-dev-827099598475.us-central1.run.app/health
-```
-Pipeline fails if response ≠ 200.
-
-# Versioning Strategy
-
-Semantic versioning is used:
-
-``` bash
-vMAJOR.MINOR.PATCH
-```
-
-Example:
-
-``` bash
-v1.0.2
-```
-Tags trigger release pipeline.
-
-# Secrets Used
-
-Stored securely in GitHub Actions Secrets:
-
-| Secret         | Purpose                     |
-| -------------- | --------------------------- |
-| GCP_PROJECT_ID | GCP Project                 |
-| GCP_SA_KEY     | Service account credentials |
-
-# Deployment Platform
-
-All services are deployed to:
-    Google Cloud Run
-
-Features used:
-    serverless container hosting
-    auto scaling
-    HTTPS endpoints
-    IAM access control
-
-# Running Locally
-
-## Clone repo:
-
-``` bash 
-git clone https://github.com/surekhajanapareddy/ml-module3-milestone2
-cd repo
-```
-
-## Build image:
-
-``` bash 
 docker build -t ml-api .
 ```
 
-## Run container:
-
-``` bash
+Run container
+```
 docker run -p 8000:8000 ml-api
 ```
 
-## Test locally:
-
-``` bash
+Test API
+```
 http://localhost:8000/docs
 ```
 
-# Reproducibility Guarantee
+---
 
-Anyone can reproduce deployment in under 5 minutes:
+## Project Status
 
-``` bash
-git clone repo
-docker build .
-```
-No manual environment setup required.
+Pipeline Status → Fully Automated  
+Deployment → Multi-Environment Progressive Delivery  
+Testing → Automated Post-Deployment Validation  
 
-# Production-Grade Features Implemented
+---
 
-    ✔ Multi-environment promotion pipeline
-    ✔ Immutable container builds
-    ✔ Artifact reuse across stages
-    ✔ Automated testing gates
-    ✔ Manual approval for production
-    ✔ Secure secret handling
-    ✔ Semantic version releases
-    ✔ Infrastructure-independent deployment
-    ✔ Rollback capability
+## Documentation
 
-# Evidence
+For operational and engineering details see:
 
-Include screenshots of:
-    successful pipeline run
-    artifact registry images
-    cloud run services
-    version tag deployment
+**RUNBOOK.md**
 
-# Learning Outcomes Demonstrated
+---
 
-This project demonstrates real-world MLOps capabilities:
-    CI/CD pipeline design
-    cloud deployment
-    containerization
-    environment promotion strategy
-    automated validation
-    release management
-    production readiness
 
-# Final Status
-
-    Pipeline Status: ✅ Fully Working
-    Deployment: ✅ Multi-Environment
-    Testing: ✅ Automated
-    Release Flow: ✅ Version-Controlled
